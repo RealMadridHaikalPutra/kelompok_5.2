@@ -1,0 +1,3 @@
+# Paket sistem yang diinstal Streamlit Community Cloud (apt).
+# Wajib agar pytesseract menemukan binary `tesseract`.
+tesseract-ocr

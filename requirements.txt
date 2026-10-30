@@ -1,0 +1,6 @@
+streamlit>=1.37
+fast-alpr[onnx]
+easyocr
+opencv-python-headless
+numpy
+Pillow

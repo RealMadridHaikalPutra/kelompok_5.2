@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import threading
 from dataclasses import dataclass, field
+from plate_fix import vote, sepakat
 
 import cv2
 import numpy as np
@@ -170,33 +171,26 @@ def ocr_easyocr(gambar) -> tuple[str, float]:
 
 
 def baca_plat(crop_zoom, teks_alpr=None, conf_alpr=0.0, fast=True):
-    """Kembalikan (teks, conf, sumber, kandidat, citra_preprocessing)."""
     variants = varian_preprocessing(crop_zoom)
-    kandidat: list[tuple[float, str, float, str]] = []
+    reads = []  # (teks, conf, nama)
 
     if teks_alpr:
-        t = bersihkan(teks_alpr)
-        kandidat.append((skor(t, conf_alpr), t, conf_alpr, "fast-alpr"))
-        # Mode cepat: bila OCR bawaan sudah yakin & format valid, lewati EasyOCR.
-        if fast and kandidat[0][0] >= EARLY_STOP_SCORE:
-            kandidat.sort(reverse=True)
-            _, t, c, s = kandidat[0]
-            return t, c, s, kandidat, variants["sharp"]
+        reads.append((bersihkan(teks_alpr), conf_alpr, "fast-alpr"))
 
     for nama in VARIANT_ORDER:
         t, c = ocr_easyocr(variants[nama])
-        if not t:
-            continue
-        kandidat.append((skor(t, c), t, c, nama))
-        if fast and kandidat[-1][0] >= EARLY_STOP_SCORE:
+        if t:
+            reads.append((t, c, nama))
+        # Berhenti dini hanya bila 2 bacaan INDEPENDEN sudah sama persis
+        if fast and sepakat(reads, minimal=2):
             break
 
-    if not kandidat:
+    hasil = vote(reads)
+    if not hasil:
         return "", 0.0, "-", [], variants["sharp"]
-    kandidat.sort(reverse=True)
-    _, t, c, s = kandidat[0]
-    return t, c, s, kandidat, variants["sharp"]
-
+    teks, kesepakatan = hasil
+    kandidat = [(0, t, c, n) for t, c, n in reads]
+    return teks, kesepakatan, f"voting {len(reads)} bacaan", kandidat, variants["sharp"]
 
 def deteksi_cadangan(img):
     """Bila YOLO gagal: cari teks berpola plat di seluruh gambar."""
